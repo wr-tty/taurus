@@ -312,7 +312,7 @@ class VirtualDisplay(Service, Singletone):
             VirtualDisplay.SHARED_VIRTUAL_DISPLAY[self.engine] = self.virtual_display
             self.engine.shared_env.set({"DISPLAY": self.virtual_display.new_display_var})
 
-    def free_virtual_display(self):
+    def post_process(self):
         if self.virtual_display and self.virtual_display.is_alive():
             os.environ["DISPLAY"] = self.virtual_display.new_display_var
             self.virtual_display.stop()
@@ -333,6 +333,3 @@ class VirtualDisplay(Service, Singletone):
     def check(self):
         self.check_virtual_display()
         return False
-
-    def shutdown(self):
-        self.free_virtual_display()
