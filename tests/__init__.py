@@ -26,7 +26,7 @@ ROOT_LOGGER = logging.getLogger("")
 def setup_test_logging():
     """ set up test logging for convenience in IDE """
     if not ROOT_LOGGER.handlers:
-        CLI.log = None
+        CLI.log = ''
         CLI.verbose = True
         CLI.setup_logging(CLI)
     else:
