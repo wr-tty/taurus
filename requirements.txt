@@ -1,3 +1,4 @@
+prometheus_client
 apiritif>=0.6.7
 astunparse>=1.6.0
 colorama; sys_platform == 'win32'
