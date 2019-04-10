@@ -3,7 +3,7 @@
 from bzt.engine import Reporter, Singletone
 from bzt.modules.aggregator import AggregatorListener, ResultsProvider
 from bzt.six import iteritems
-from prometheus_client import Gauge, Histogram, start_http_server, Counter
+from prometheus_client import Gauge, Histogram, start_http_server, Counter, Summary
 
 
 class PrometheusStatusReporter(Reporter, AggregatorListener, Singletone):
@@ -19,6 +19,10 @@ class PrometheusStatusReporter(Reporter, AggregatorListener, Singletone):
         self.bztTestConcurrentUsers = None
         self.bztTestSuccessRequestCount = None
         self.bztTestErrorRequestCount = None
+        self.bztResponseTimeSeconds = None
+        self.bztConnectionTimeSeconds = None
+        self.bztLatencyTimeSeconds = None
+        self.bztTestSendBytesGauge = None
         self.bztTestThroughput = None
 
     def prepare(self):
@@ -43,9 +47,10 @@ class PrometheusStatusReporter(Reporter, AggregatorListener, Singletone):
         common_labels = (
             'test_label',
             # 'throughput',
-            'concurrency',
-            'succ',
-            'fail',
+            # 'concurrency',
+            # 'succ',
+            # 'fail',
+            'response_code',
             # 'avg_rt',
             # 'stdev_rt',
             # 'avg_lt',
@@ -95,6 +100,26 @@ class PrometheusStatusReporter(Reporter, AggregatorListener, Singletone):
             'Provide BlazeMeter test error request count',
             common_labels,
         )
+        self.bztResponseTimeSeconds = Gauge(
+            'bzt_test_response_time_seconds',
+            'Provide BlazeMeter test response times',
+            common_labels,
+        )
+        self.bztConnectionTimeSeconds = Gauge(
+            'bzt_test_connection_time_seconds',
+            'Provide BlazeMeter test connection times',
+            common_labels,
+        )
+        self.bztLatencyTimeSeconds = Gauge(
+            'bzt_test_latency_time_seconds',
+            'Provide BlazeMeter test latency times',
+            common_labels,
+        )
+        self.bztTestSendBytesGauge = Gauge(
+            'bzt_test_send_bytes_gauge',
+            'Provide BlazeMeter test send bytes',
+            common_labels,
+        )
         self.bztTestThroughput = Counter(
             'bzt_test_throughput',
             'Provide BlazeMeter throughput',
@@ -125,11 +150,10 @@ class PrometheusStatusReporter(Reporter, AggregatorListener, Singletone):
                     self.assign_values(test_label, values)
 
     def assign_values(self, test_label, values):
+        return_code = values['rc'].elements()
         label_values = {
             'test_label': test_label,
-            'concurrency': values['concurrency'],
-            'succ': values['succ'],
-            'fail': values['fail']
+            'response_code': next(return_code)
         }
         bzt_test_send_bytes_instance = self.bztTestSendBytes.labels(**label_values)
         bzt_test_send_bytes_instance.observe(values['bytes'])
@@ -145,11 +169,21 @@ class PrometheusStatusReporter(Reporter, AggregatorListener, Singletone):
         bzt_test_success_request_count.inc(values['succ'])
         bzt_test_error_request_count = self.bztTestErrorRequestCount.labels(**label_values)
         bzt_test_error_request_count.inc(values['fail'])
+        bzt_test_response_time = self.bztResponseTimeSeconds.labels(**label_values)
+        bzt_test_response_time.set(values['avg_rt'])
+        bzt_test_latency_time = self.bztLatencyTimeSeconds.labels(**label_values)
+        bzt_test_latency_time.set(values['avg_lt'])
+        bzt_test_connection_time = self.bztConnectionTimeSeconds.labels(**label_values)
+        bzt_test_connection_time.set(values['avg_ct'])
+        bzt_test_send_bytes_gauge = self.bztTestSendBytesGauge.labels(**label_values)
+        bzt_test_send_bytes_gauge.set(values['bytes'])
         bzt_test_throughput = self.bztTestThroughput.labels(**label_values)
         bzt_test_throughput.inc(values['throughput'])
 
     def post_process(self):
-        pass
+        self.log.info("Sending remaining KPI data to prometheus...")
+        self.__send_data(self.kpi_buffer)
+        self.kpi_buffer = []
 
     def aggregated_second(self, data):
         self.kpi_buffer.append(data)
