@@ -143,7 +143,6 @@ class PrometheusStatusReporter(Reporter, AggregatorListener, Singletone):
         """
         :type data: list[bzt.modules.aggregator.DataPoint]
         """
-        self.log.info("Data to send: %s", data)
         for dataRow in data:
             for test_label, values in iteritems(dataRow['current']):
                 if len(test_label) > 0:
